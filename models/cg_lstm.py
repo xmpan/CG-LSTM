@@ -36,7 +36,7 @@ def unit_vector_loss(pred_theta_phi: torch.Tensor, target_theta_phi: torch.Tenso
 
 
 class TwoStageFusion(nn.Module):
-    """GMU fusion of ASC correlations followed by per-step RLOS fusion."""
+    """GMU fusion of ASC correlations followed by RLOS cross-attention."""
 
     def __init__(self, dim: int):
         super().__init__()
@@ -55,14 +55,6 @@ class TwoStageFusion(nn.Module):
         self.value = nn.Linear(dim, dim)
         self.out = nn.Linear(dim, dim)
         self.scale = dim ** -0.5
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        for module in self.modules():
-            if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
-                if module.bias is not None:
-                    nn.init.zeros_(module.bias)
 
     def forward(
         self,
@@ -80,11 +72,8 @@ class TwoStageFusion(nn.Module):
         k = self.key(rlos_feature)
         v = self.value(rlos_feature)
 
-        # Fuse each adjacent HRRP pair with its own RLOS increment instead of
-        # mixing all time steps together. This keeps the geometric prior local
-        # to the corresponding pair while still using a scaled query-key score.
-        attn = torch.sigmoid(torch.sum(q * k, dim=-1, keepdim=True) * self.scale)
-        gamma = self.out(attn * v)
+        attn = torch.softmax(torch.matmul(q, k.transpose(-2, -1)) * self.scale, dim=-1)
+        gamma = self.out(torch.matmul(attn, v))
         return gamma
 
 
@@ -100,19 +89,6 @@ class CGLSTMCell(nn.Module):
         self.gamma_f = nn.Linear(fusion_dim, hidden_dim, bias=False)
         self.gamma_c = nn.Linear(fusion_dim, hidden_dim, bias=False)
         self.gamma_o = nn.Linear(fusion_dim, hidden_dim, bias=False)
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        nn.init.xavier_uniform_(self.base.weight)
-        nn.init.zeros_(self.base.bias)
-
-        # A positive forget-gate bias is a standard stabilizing choice for LSTM
-        # training and helps retain useful memory at the start of optimization.
-        hidden_dim = self.hidden_dim
-        self.base.bias.data[hidden_dim:2 * hidden_dim].fill_(1.0)
-
-        for module in (self.gamma_i, self.gamma_f, self.gamma_c, self.gamma_o):
-            nn.init.xavier_uniform_(module.weight, gain=0.5)
 
     def forward(
         self,
@@ -183,11 +159,6 @@ class CGLSTM(nn.Module):
         self.fusion = TwoStageFusion(self.config.fusion_dim)
         self.backbone = StackedCGLSTM(self.config)
         self.regressor = nn.Linear(self.config.hidden_dim, 2)
-        self.reset_parameters()
-
-    def reset_parameters(self) -> None:
-        nn.init.xavier_uniform_(self.regressor.weight)
-        nn.init.zeros_(self.regressor.bias)
 
     def forward(
         self,
