@@ -52,7 +52,7 @@ pip install -r requirements.txt
 python code/train_main_angular_domain_corrl_lstm.py \
   --train-dir code/data/train \
   --test-dir code/data/test \
-  --metadata code/data/attitute_npi_to_pi.json \
+  --metadata code/data/attitute_ground_truth.json \
   --epochs 100 \
   --batch-size 80
 ```
