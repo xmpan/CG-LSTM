@@ -1,0 +1,20 @@
+{   
+    "train_set" : ["attitude_1","attitude_2","attitude_3"],
+    "test_set" : ["attitude_1","attitude_2","attitude_3"],
+    
+    "attitude_1": {
+        "theta_to_z": 59.61,
+        "theta": 30.39,
+        "phi":  21.11
+    },
+    "attitude_2": {
+        "theta_to_z": 36.3249,
+        "theta": 53.68,
+        "phi": 115.16
+    },
+    "attitude_3": {
+        "theta_to_z": 30.4915,
+        "theta": 59.5085,
+        "phi": 132.39
+    }
+}
